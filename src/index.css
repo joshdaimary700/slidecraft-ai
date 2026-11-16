@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* SlideCraft AI Animated Shapes & Transitions */
+@keyframes slideFloat {
+  0%, 100% { transform: translateY(0px) rotate(var(--sh-rotate, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--sh-rotate, 0deg)); }
+}
+
+@keyframes slidePulse {
+  0%, 100% { transform: scale(1) rotate(var(--sh-rotate, 0deg)); opacity: 0.95; }
+  50% { transform: scale(1.05) rotate(var(--sh-rotate, 0deg)); opacity: 1; }
+}
+
+@keyframes slideSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideBounce {
+  0%, 100% { transform: translateY(0) rotate(var(--sh-rotate, 0deg)); }
+  30% { transform: translateY(-12px) rotate(var(--sh-rotate, 0deg)); }
+  50% { transform: translateY(0) rotate(var(--sh-rotate, 0deg)); }
+  70% { transform: translateY(-5px) rotate(var(--sh-rotate, 0deg)); }
+}
+
+@keyframes slideShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideZoomIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideFlipIn {
+  from { opacity: 0; transform: perspective(1000px) rotateY(30deg) scale(0.95); }
+  to { opacity: 1; transform: perspective(1000px) rotateY(0deg) scale(1); }
+}
+
+@keyframes slideFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.anim-float { animation: slideFloat 4s ease-in-out infinite; }
+.anim-pulse { animation: slidePulse 3s ease-in-out infinite; }
+.anim-spin { animation: slideSpin 12s linear infinite; }
+.anim-bounce { animation: slideBounce 2.5s ease infinite; }
+.anim-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: slideShimmer 3s infinite;
+}
+
+.transition-slide-left { animation: slideInLeft 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.transition-slide-right { animation: slideInRight 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.transition-zoom { animation: slideZoomIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.transition-flip { animation: slideFlipIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.transition-fade { animation: slideFadeIn 0.35s ease-out forwards; }
+.transition-bounce { animation: slideBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

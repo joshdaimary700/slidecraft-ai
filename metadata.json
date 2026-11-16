@@ -1,0 +1,6 @@
+{
+  "name": "SlideCraft AI",
+  "description": "Turn Your Ideas Into Beautiful Presentations. AI-powered presentation creation platform with interactive slide editing, template library, and real PowerPoint (.pptx) & PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,75 @@
+plugins {
+    id 'com.android.application'
+}
+
+def twaManifest = [
+    applicationId: 'com.slidecraft.ai',
+    hostName: 'slidecraft-ai.onrender.com'
+    launchUrl: '/',
+    name: 'SlideCraft AI',
+    launcherName: 'SlideCraft',
+    themeColor: '#0F172A',
+    themeColorDark: '#0F172A',
+    navigationColor: '#FFFFFF',
+    navigationColorDark: '#0F172A',
+    navigationDividerColor: '#E2E8F0',
+    navigationDividerColorDark: '#1E293B',
+    backgroundColor: '#FFFFFF',
+    enableNotifications: true,
+    fallbackType: 'customtabs',
+    orientation: 'default'
+]
+
+android {
+    namespace 'com.slidecraft.ai'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId twaManifest.applicationId
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+
+        resValue "string", "app_name", twaManifest.name
+        resValue "string", "launcher_name", twaManifest.launcherName
+        resValue "string", "host_name", twaManifest.hostName
+        resValue "string", "launch_url", "https://" + twaManifest.hostName + twaManifest.launchUrl
+        resValue "string", "provider_authority", twaManifest.applicationId + ".fileprovider"
+        resValue "string", "asset_statements", '[{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "android_app", "package_name": "' + twaManifest.applicationId + '", "site": "https://' + twaManifest.hostName + '"}}]'
+
+        manifestPlaceholders = [
+            hostName: twaManifest.hostName,
+            defaultUrl: "https://" + twaManifest.hostName + twaManifest.launchUrl,
+            launcherName: twaManifest.launcherName,
+            fallbackStrategy: twaManifest.fallbackType
+        ]
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "slidecraft123"
+            keyAlias "slidecraft"
+            keyPassword "slidecraft123"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+    implementation 'androidx.browser:browser:1.8.0'
+}
