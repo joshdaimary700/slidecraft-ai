@@ -1,12 +1,9 @@
 {
-  "projectId": "slidecraft-ai-c1172",
-  "appId": "1:628925061198:web:5a46f6d153e973825b0b1f",
-  "apiKey": "AIzaSyDQLFagongmyaBcL6cdPjqIhas4A5Q9XP8",
+  "apiKey": "AIzaSyDxLZXmjMsdPSK5irRBt9XoBhm7hDA3azqE",
   "authDomain": "slidecraft-ai-c1172.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-slidecraftai-4216d74f-44c8-415b-8aba-bd6a85c6789a",
-  "storageBucket": "gen-lang-client-0494444861.firebasestorage.app",
-  "messagingSenderId": "628925061198",
-  "measurementId": "",
-  "oAuthClientId": "628925061198-nfoo7a23r91f1bbdmha4t5a8q96c8nv8.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "slidecraft-ai-c1172",
+  "storageBucket": "slidecraft-ai-c1172.firebasestorage.app",
+  "messagingSenderId": "1028647611179",
+  "appId": "1:1028647611179:web:40664030ef7826633d336e",
+  "measurementId": "G-1DWL2VJL9V"
 }
