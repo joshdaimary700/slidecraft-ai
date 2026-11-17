@@ -4,8 +4,7 @@ plugins {
 
 def twaManifest = [
     applicationId: 'com.slidecraft.ai',
-    hostName: 'slidecraft-ai.onrender.com'
-    launchUrl: '/',
+    hostName: 'slidecraft-ai-p6cv.onrender.com',
     name: 'SlideCraft AI',
     launcherName: 'SlideCraft',
     themeColor: '#0F172A',
