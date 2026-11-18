@@ -1,9 +1,110 @@
 import fs from 'fs';
 import path from 'path';
+import JSZip from 'jszip';
 import PDFDocument from 'pdfkit';
 import PptxGenJS from 'pptxgenjs';
 import { PRESENTATION_THEMES } from '../shared/types.ts';
-import type { PresentationRecord, SlideData, ThemeConfig } from '../shared/types.ts';
+import type {
+  PresentationRecord,
+  SlideData,
+  SlideShapeAnimation,
+  ThemeConfig,
+} from '../shared/types.ts';
+
+interface ExportShapeAnimation {
+  shapeObjectName: string;
+  labelObjectName?: string;
+  animation: Exclude<SlideShapeAnimation, 'none'>;
+}
+
+function findPptxShapeId(slideXml: string, objectName: string): string {
+  for (const match of slideXml.matchAll(/<p:sp\b[\s\S]*?<\/p:sp>/g)) {
+    const properties = match[0].match(/<p:cNvPr\b([^>]*)>/)?.[1];
+    if (!properties) continue;
+
+    const name = properties.match(/\bname="([^"]*)"/)?.[1];
+    const id = properties.match(/\bid="(\d+)"/)?.[1];
+    if (name === objectName && id) return id;
+  }
+
+  throw new Error(`Could not find PowerPoint shape "${objectName}" for its animation.`);
+}
+
+function createShapeAnimationBehavior(
+  animation: Exclude<SlideShapeAnimation, 'none'>,
+  shapeId: string,
+  nextId: () => number
+): string {
+  const duration = animation === 'spin' ? 1200 : 700;
+  const target = `<p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl>`;
+
+  if (animation === 'float' || animation === 'bounce') {
+    const path =
+      animation === 'float'
+        ? 'M 0 0 L 0 -0.12 E'
+        : 'M 0 0 L 0 -0.16 L 0 -0.04 L 0 0 E';
+    const autoReverse = animation === 'float' ? ' autoRev="1"' : '';
+    return `<p:animMotion origin="layout" path="${path}" pathEditMode="relative"><p:cBhvr><p:cTn id="${nextId()}" dur="${duration}" fill="hold"${autoReverse}/>${target}<p:attrNameLst><p:attrName>ppt_x</p:attrName><p:attrName>ppt_y</p:attrName></p:attrNameLst></p:cBhvr></p:animMotion>`;
+  }
+
+  if (animation === 'pulse') {
+    return `<p:animScale><p:cBhvr><p:cTn id="${nextId()}" dur="${duration}" fill="hold" autoRev="1"/>${target}</p:cBhvr><p:from x="100000" y="100000"/><p:to x="112000" y="112000"/></p:animScale>`;
+  }
+
+  if (animation === 'spin') {
+    return `<p:animRot by="21600000"><p:cBhvr><p:cTn id="${nextId()}" dur="${duration}" fill="hold"/>${target}<p:attrNameLst><p:attrName>r</p:attrName></p:attrNameLst></p:cBhvr></p:animRot>`;
+  }
+
+  return `<p:animEffect transition="in" filter="wipe(rightToLeft)"><p:cBhvr><p:cTn id="${nextId()}" dur="${duration}" fill="hold"/>${target}</p:cBhvr></p:animEffect>`;
+}
+
+function createShapeAnimationTiming(
+  slideXml: string,
+  animations: ExportShapeAnimation[]
+): string {
+  const ids = animations.map((entry) => ({
+    animation: entry.animation,
+    shapeId: findPptxShapeId(slideXml, entry.shapeObjectName),
+    labelId: entry.labelObjectName
+      ? findPptxShapeId(slideXml, entry.labelObjectName)
+      : undefined,
+  }));
+  const targetIds = ids.flatMap((entry) =>
+    entry.labelId ? [entry.shapeId, entry.labelId] : [entry.shapeId]
+  );
+  const timingIds = [...slideXml.matchAll(/<p:cTn\b[^>]*\bid="(\d+)"/g)].map((match) =>
+    Number(match[1])
+  );
+  let nextTimingId = Math.max(0, ...timingIds) + 1;
+  const nextId = () => nextTimingId++;
+
+  const setVisibility = (shapeId: string, value: 'hidden' | 'visible') =>
+    `<p:set><p:cBhvr><p:cTn id="${nextId()}" dur="1" fill="hold"/>` +
+    `<p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl>` +
+    '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>' +
+    `</p:cBhvr><p:to><p:strVal val="${value}"/></p:to></p:set>`;
+
+  const initiallyHidden = targetIds.map((id) => setVisibility(id, 'hidden')).join('');
+  const clickEffects = ids
+    .map((entry) => {
+      const visible = [
+        setVisibility(entry.shapeId, 'visible'),
+        ...(entry.labelId ? [setVisibility(entry.labelId, 'visible')] : []),
+      ].join('');
+      const behaviors = [
+        createShapeAnimationBehavior(entry.animation, entry.shapeId, nextId),
+        ...(entry.labelId
+          ? [createShapeAnimationBehavior(entry.animation, entry.labelId, nextId)]
+          : []),
+      ].join('');
+      return `<p:par><p:cTn id="${nextId()}" presetID="1" presetClass="entr" presetSubtype="0" fill="hold" grpId="0" nodeType="clickEffect"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${visible}${behaviors}</p:childTnLst></p:cTn></p:par>`;
+    })
+    .join('');
+  const initialState = `<p:par><p:cTn id="${nextId()}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${initiallyHidden}</p:childTnLst></p:cTn></p:par>`;
+  const buildList = targetIds.map((id) => `<p:bldP spid="${id}" grpId="0"/>`).join('');
+
+  return `<p:timing><p:tnLst><p:par><p:cTn id="${nextId()}" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="${nextId()}" dur="indefinite" nodeType="mainSeq"><p:childTnLst>${initialState}${clickEffects}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq></p:childTnLst></p:cTn></p:par></p:tnLst><p:bldLst>${buildList}</p:bldLst></p:timing>`;
+}
 
 function stripHash(hex: string | undefined, fallback: string): string {
   const clean = (hex || fallback || '#0F172A').replace('#', '').trim();
@@ -21,7 +122,9 @@ function resolveLocalImagePath(imageUrl?: string): string | null {
     return fs.existsSync(p) ? p : null;
   }
   if (imageUrl.startsWith('/uploads/')) {
-    const p = path.join(process.cwd(), imageUrl.slice(1));
+    const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads'));
+    const p = path.resolve(uploadsDir, imageUrl.slice('/uploads/'.length));
+    if (!p.startsWith(`${uploadsDir}${path.sep}`)) return null;
     return fs.existsSync(p) ? p : null;
   }
   return null;
@@ -56,9 +159,11 @@ export async function generatePptxBuffer(
   const W = 10;
   const H = is43 ? 7.5 : 5.625;
   const theme = getTheme(presentation.themeId);
+  const shapeAnimationsBySlide: ExportShapeAnimation[][] = [];
 
   for (let idx = 0; idx < slides.length; idx++) {
     const s = slides[idx];
+    const slideAnimations: ExportShapeAnimation[] = [];
     const slide = pptx.addSlide();
 
     const bgHex = stripHash(s.backgroundColor || theme.canvasBg, 'FFFFFF');
@@ -688,17 +793,36 @@ export async function generatePptxBuffer(
       }
 
       // Custom shapes added in editor
-      for (const sh of s.shapes || []) {
+      for (const [shapeIndex, sh] of (s.shapes || []).entries()) {
+        const shapeObjectName = `slidecraft-shape-${idx}-${shapeIndex}`;
+        const labelObjectName = `slidecraft-label-${idx}-${shapeIndex}`;
         const shapeType =
-          sh.type === 'circle' ? pptx.ShapeType.ellipse : pptx.ShapeType.roundRect;
+          sh.type === 'circle'
+            ? pptx.ShapeType.ellipse
+            : sh.type === 'star'
+              ? pptx.ShapeType.star5
+              : sh.type === 'callout'
+                ? pptx.ShapeType.cloudCallout
+                : sh.type === 'rect'
+                  ? pptx.ShapeType.rect
+                  : pptx.ShapeType.roundRect;
         slide.addShape(shapeType, {
           x: (sh.x / 100) * W,
           y: (sh.y / 100) * H,
           w: (sh.w / 100) * W,
           h: (sh.h / 100) * H,
+          rotate: sh.rotation || 0,
+          objectName: shapeObjectName,
           fill: { color: stripHash(sh.color, accentHex), transparency: 15 },
           line: { color: stripHash(sh.color, accentHex), width: 1 },
         });
+        if (sh.animation && sh.animation !== 'none') {
+          slideAnimations.push({
+            shapeObjectName,
+            labelObjectName: sh.label ? labelObjectName : undefined,
+            animation: sh.animation,
+          });
+        }
         if (sh.label) {
           slide.addText(sh.label, {
             x: (sh.x / 100) * W,
@@ -711,6 +835,7 @@ export async function generatePptxBuffer(
             color: 'FFFFFF',
             align: 'center',
             valign: 'middle',
+            objectName: labelObjectName,
           });
         }
       }
@@ -731,10 +856,45 @@ export async function generatePptxBuffer(
     if (s.speakerNotes) {
       slide.addNotes(s.speakerNotes);
     }
+    shapeAnimationsBySlide[idx] = slideAnimations;
   }
 
   const out = await pptx.write({ outputType: 'nodebuffer' });
-  return Buffer.from(out as Uint8Array);
+  const zip = await JSZip.loadAsync(Buffer.from(out as Uint8Array));
+  const transitionMarkup: Record<string, string> = {
+    fade: '<p:fade/>',
+    'slide-left': '<p:push dir="l"/>',
+    'slide-right': '<p:push dir="r"/>',
+    zoom: '<p:zoom/>',
+    flip: '<p:flip dir="l"/>',
+    bounce: '<p:zoom/>',
+  };
+
+  for (let idx = 0; idx < slides.length; idx++) {
+    const effect = slides[idx].transitionEffect || 'fade';
+    const transition = transitionMarkup[effect];
+    const animationEntries = shapeAnimationsBySlide[idx] || [];
+    if ((!transition || effect === 'none') && animationEntries.length === 0) continue;
+
+    const slideXmlPath = `ppt/slides/slide${idx + 1}.xml`;
+    const slideXmlFile = zip.file(slideXmlPath);
+    if (!slideXmlFile) {
+      throw new Error(`Could not add slide transition: ${slideXmlPath} was not generated.`);
+    }
+
+    const slideXml = await slideXmlFile.async('string');
+    const transitionXml =
+      transition && effect !== 'none'
+        ? `<p:transition spd="med" advClick="1">${transition}</p:transition>`
+        : '';
+    const timingXml =
+      animationEntries.length > 0
+        ? createShapeAnimationTiming(slideXml, animationEntries)
+        : '';
+    zip.file(slideXmlPath, slideXml.replace('</p:sld>', `${transitionXml}${timingXml}</p:sld>`));
+  }
+
+  return Buffer.from(await zip.generateAsync({ type: 'nodebuffer' }));
 }
 
 export async function generatePdfBuffer(

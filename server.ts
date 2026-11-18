@@ -36,20 +36,28 @@ import {
 import { extractDocumentStructured } from './src/server/docParser.ts';
 import { generateAndroidStudioProjectZip } from './src/server/androidExport.ts';
 import { generateOutlineText, generatePdfBuffer, generatePptxBuffer } from './src/server/exporter.ts';
-import { CURATED_VISUALS, SUBSCRIPTION_PLANS } from './src/shared/types.ts';
+import {
+  CURATED_VISUALS,
+  SLIDE_TRANSITION_EFFECTS,
+  SUBSCRIPTION_PLANS,
+} from './src/shared/types.ts';
 import type { PlanCode, PresentationRecord, SlideData } from './src/shared/types.ts';
 
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 initDatabase();
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = 3000;
+const PORT = Number(process.env.PORT ?? 3000);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error(`Invalid PORT value: ${process.env.PORT}`);
+}
 
 app.use(express.json({ limit: '10mb' }));
 
 // Static assets for uploaded images and generated image library
-const uploadsPath = path.join(process.cwd(), 'uploads');
+const uploadsPath = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads'));
 const assetsImagesPath = path.join(process.cwd(), 'src', 'assets', 'images');
 app.use('/uploads', express.static(uploadsPath));
 app.use('/src/assets/images', express.static(assetsImagesPath));
@@ -189,6 +197,9 @@ function parseSlideRow(row: any): SlideData {
     titleSize: row.titleSize || 32,
     bodySize: row.bodySize || 16,
     shapes: safeJson(row.shapesJson, []),
+    transitionEffect: SLIDE_TRANSITION_EFFECTS.includes(row.transitionEffect)
+      ? row.transitionEffect
+      : 'fade',
     speakerNotes: row.speakerNotes || '',
     updatedAt: row.updatedAt,
   };
@@ -204,8 +215,8 @@ function saveSlidesForPresentation(presentationId: string, slides: Partial<Slide
       comparisonJson, featureCardsJson, quoteJson, chartDataJson,
       imageUrl, imageAlt, imagePositionJson,
       backgroundColor, titleFont, bodyFont, titleColor, bodyColor, titleSize, bodySize,
-      shapesJson, speakerNotes, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      shapesJson, transitionEffect, speakerNotes, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const tx = db.transaction((items: Partial<SlideData>[]) => {
@@ -238,6 +249,9 @@ function saveSlidesForPresentation(presentationId: string, slides: Partial<Slide
         s.titleSize || 32,
         s.bodySize || 16,
         JSON.stringify(s.shapes || []),
+        s.transitionEffect && SLIDE_TRANSITION_EFFECTS.includes(s.transitionEffect)
+          ? s.transitionEffect
+          : 'fade',
         s.speakerNotes || '',
         now
       );

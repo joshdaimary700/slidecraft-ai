@@ -69,12 +69,14 @@ export const SharedPresentationView: React.FC<SharedPresentationViewProps> = ({
       <div className="flex-1 flex items-center justify-center my-6">
         <div className="w-full max-w-5xl">
           <SlideRenderer
+            key={slides[idx].id}
             slide={slides[idx]}
             themeId={pres.themeId}
             aspectRatio={pres.aspectRatio}
             slideIndex={idx}
             totalSlides={slides.length}
             deckTitle={pres.title}
+            animateTransition
           />
         </div>
       </div>

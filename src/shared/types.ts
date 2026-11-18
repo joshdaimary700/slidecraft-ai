@@ -330,7 +330,19 @@ export interface SlideChartData {
   data: Array<{ label: string; value: number }>;
 }
 
-export type SlideTransitionEffect = 'fade' | 'slide-left' | 'slide-right' | 'zoom' | 'flip' | 'bounce';
+export const SLIDE_TRANSITION_EFFECTS = [
+  'none',
+  'fade',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  'flip',
+  'bounce',
+] as const;
+export type SlideTransitionEffect = (typeof SLIDE_TRANSITION_EFFECTS)[number];
+
+export const SLIDE_SHAPE_ANIMATIONS = ['none', 'float', 'pulse', 'spin', 'bounce', 'shimmer'] as const;
+export type SlideShapeAnimation = (typeof SLIDE_SHAPE_ANIMATIONS)[number];
 
 export interface SlideShapeElement {
   id: string;
@@ -342,7 +354,7 @@ export interface SlideShapeElement {
   h: number;
   color: string;
   rotation?: number;
-  animation?: 'float' | 'pulse' | 'spin' | 'bounce' | 'shimmer' | 'none';
+  animation?: SlideShapeAnimation;
 }
 
 export interface SlideData {

@@ -99,9 +99,24 @@ export const GeneratorWorkspace: React.FC<GeneratorWorkspaceProps> = ({
   const [themeId, setThemeId] = useState('navy-indigo');
 
   const [generating, setGenerating] = useState(false);
+  const [generationElapsed, setGenerationElapsed] = useState(0);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pictureUploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!generating) {
+      setGenerationElapsed(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      setGenerationElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [generating]);
 
   useEffect(() => {
     let mounted = true;
@@ -161,6 +176,13 @@ export const GeneratorWorkspace: React.FC<GeneratorWorkspaceProps> = ({
     () => PRESENTATION_THEMES.find((t) => t.id === themeId) || PRESENTATION_THEMES[0],
     [themeId]
   );
+
+  const generationStage = useMemo(() => {
+    if (generationElapsed < 8) return 'Preparing your presentation';
+    if (generationElapsed < 35) return 'Writing and organizing slide content';
+    if (generationElapsed < 90) return 'Applying layouts and visual structure';
+    return 'Finalizing slides and saving the presentation';
+  }, [generationElapsed]);
 
   const handleSelectTemplate = (tpl: TemplateRecord | null) => {
     if (!tpl) {
@@ -322,11 +344,14 @@ export const GeneratorWorkspace: React.FC<GeneratorWorkspaceProps> = ({
       content === extractedSnapshot;
 
     setGenerating(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 240_000);
     try {
       const res = await apiFetch<{ presentationId: string; user: AuthUser }>(
         '/api/presentations/generate',
         {
           method: 'POST',
+          signal: controller.signal,
           body: JSON.stringify({
             sourceType,
             content: content.trim(),
@@ -348,8 +373,15 @@ export const GeneratorWorkspace: React.FC<GeneratorWorkspaceProps> = ({
       );
       onGenerated(res.presentationId, res.user);
     } catch (err: any) {
-      setError(err?.message || 'Failed to generate presentation.');
+      if (err?.name === 'AbortError') {
+        setError(
+          'Slide generation took longer than 4 minutes and was stopped. Try fewer slides or a shorter topic, then try again.'
+        );
+      } else {
+        setError(err?.message || 'Failed to generate presentation.');
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setGenerating(false);
     }
   };
@@ -1167,29 +1199,39 @@ export const GeneratorWorkspace: React.FC<GeneratorWorkspaceProps> = ({
           <p className="text-xs text-slate-500">
             Failed generations never consume presentation credits. All slides are auto-saved for editing.
           </p>
-          <button
-            type="submit"
-            disabled={generating || extracting}
-            className="px-6 py-3 rounded-xl bg-indigo-700 text-white text-sm font-semibold hover:bg-indigo-800 disabled:opacity-60 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>
-                  {isExactModeActive
-                    ? `Building ${effectiveSlideCount} exact ${effectiveSlideCount === 1 ? 'slide' : 'slides'}...`
-                    : `Generating ${effectiveSlideCount} slides...`}
-                </span>
-              </>
-            ) : (
-              <>
-                <span>
-                  {isExactModeActive ? 'Generate Exact Presentation' : 'Generate Presentation'}
-                </span>
-                <ArrowRight className="w-4 h-4" />
-              </>
+          <div className="flex items-center gap-3">
+            {generating && (
+              <div className="text-right" role="status" aria-live="polite">
+                <p className="text-xs font-semibold text-indigo-700">{generationStage}</p>
+                <p className="text-[11px] text-slate-500">
+                  {generationElapsed}s elapsed · Please keep this page open
+                </p>
+              </div>
             )}
-          </button>
+            <button
+              type="submit"
+              disabled={generating || extracting}
+              className="px-6 py-3 rounded-xl bg-indigo-700 text-white text-sm font-semibold hover:bg-indigo-800 disabled:opacity-60 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>
+                    {isExactModeActive
+                      ? `Building ${effectiveSlideCount} exact ${effectiveSlideCount === 1 ? 'slide' : 'slides'}...`
+                      : `Generating ${effectiveSlideCount} slides...`}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {isExactModeActive ? 'Generate Exact Presentation' : 'Generate Presentation'}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

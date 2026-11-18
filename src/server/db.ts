@@ -7,12 +7,12 @@ import type { PlanCode } from '../shared/types.ts';
 
 export const FOUNDER_EMAIL = 'joshdaimary700@gmail.com';
 
-const dataDir = path.join(process.cwd(), 'data');
+const dataDir = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'));
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const uploadsDir = path.join(process.cwd(), 'uploads');
+const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads'));
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -92,6 +92,7 @@ export function initDatabase() {
       titleSize INTEGER DEFAULT 32,
       bodySize INTEGER DEFAULT 16,
       shapesJson TEXT DEFAULT '[]',
+      transitionEffect TEXT NOT NULL DEFAULT 'fade',
       speakerNotes TEXT DEFAULT '',
       updatedAt TEXT NOT NULL
     );
@@ -213,6 +214,13 @@ export function initDatabase() {
       updatedAt TEXT NOT NULL
     );
   `);
+
+  const slideColumns = db
+    .prepare('PRAGMA table_info(PresentationSlides)')
+    .all() as Array<{ name: string }>;
+  if (!slideColumns.some((column) => column.name === 'transitionEffect')) {
+    db.exec("ALTER TABLE PresentationSlides ADD COLUMN transitionEffect TEXT NOT NULL DEFAULT 'fade'");
+  }
 
   seedTemplates();
   seedDefaultSettingsAndPromotions();

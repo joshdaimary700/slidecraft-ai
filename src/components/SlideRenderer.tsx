@@ -14,7 +14,14 @@ import {
   YAxis,
 } from 'recharts';
 import { Image as ImageIcon } from 'lucide-react';
-import { AspectRatio, PRESENTATION_THEMES, SlideData, ThemeConfig } from '../shared/types';
+import {
+  AspectRatio,
+  PRESENTATION_THEMES,
+  SLIDE_SHAPE_ANIMATIONS,
+  SLIDE_TRANSITION_EFFECTS,
+  SlideData,
+  ThemeConfig,
+} from '../shared/types';
 
 interface SlideRendererProps {
   slide: SlideData;
@@ -25,6 +32,7 @@ interface SlideRendererProps {
   slideIndex?: number;
   totalSlides?: number;
   deckTitle?: string;
+  animateTransition?: boolean;
   onUpdate?: (patch: Partial<SlideData>) => void;
 }
 
@@ -90,6 +98,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
   slideIndex = 0,
   totalSlides = 1,
   deckTitle = '',
+  animateTransition = false,
   onUpdate,
 }) => {
   const theme = PRESENTATION_THEMES.find((t) => t.id === themeId) || PRESENTATION_THEMES[0];
@@ -102,6 +111,61 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
   const titlePx = compact ? 13 : Math.max(18, Math.min(42, slide.titleSize || 28));
   const bodyPx = compact ? 9 : Math.max(12, Math.min(22, slide.bodySize || 15));
   const aspectClass = aspectRatio === '4:3' ? 'aspect-[4/3]' : 'aspect-[16/9]';
+  const transitionEffect = SLIDE_TRANSITION_EFFECTS.includes(slide.transitionEffect || 'fade')
+    ? slide.transitionEffect || 'fade'
+    : 'fade';
+  const transitionClass =
+    animateTransition && !compact && transitionEffect !== 'none'
+      ? `transition-${transitionEffect}`
+      : '';
+
+  const renderShapeOverlays = () =>
+    !compact &&
+    (slide.shapes || []).map((sh) => (
+      <div
+        key={sh.id}
+        className={`absolute flex items-center justify-center text-xs font-semibold text-white shadow-sm pointer-events-none ${
+          sh.animation &&
+          sh.animation !== 'none' &&
+          SLIDE_SHAPE_ANIMATIONS.includes(sh.animation)
+            ? `anim-${sh.animation}`
+            : ''
+        }`}
+        style={{
+          left: `${sh.x}%`,
+          top: `${sh.y}%`,
+          width: `${sh.w}%`,
+          height: `${sh.h}%`,
+          background:
+            sh.type === 'gradient-pill'
+              ? `linear-gradient(135deg, ${sh.color}, ${theme.accentColor})`
+              : sh.type === 'glass-card'
+                ? `${sh.color}B8`
+                : sh.color,
+          borderRadius:
+            sh.type === 'circle'
+              ? '9999px'
+              : sh.type === 'gradient-pill' || sh.type === 'badge'
+                ? '9999px'
+                : sh.type === 'glass-card'
+                  ? '16px'
+                  : '10px',
+          border: sh.type === 'glass-card' ? '1px solid rgba(255,255,255,0.45)' : undefined,
+          backdropFilter: sh.type === 'glass-card' ? 'blur(8px)' : undefined,
+          clipPath:
+            sh.type === 'star'
+              ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+              : sh.type === 'callout'
+                ? 'polygon(0 0, 100% 0, 100% 82%, 64% 82%, 50% 100%, 42% 82%, 0 82%)'
+              : undefined,
+          transform: `rotate(${sh.rotation || 0}deg)`,
+          '--sh-rotate': `${sh.rotation || 0}deg`,
+          opacity: 0.92,
+        } as React.CSSProperties}
+      >
+        {sh.label}
+      </div>
+    ));
 
   const updateBullet = (idx: number, val: string) => {
     if (!onUpdate) return;
@@ -236,7 +300,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
   if (slide.layout === 'full-image-title') {
     return (
       <div
-        className={`relative w-full overflow-hidden select-none ${aspectClass} ${compact ? 'rounded-md' : 'rounded-xl'}`}
+        className={`relative w-full overflow-hidden select-none ${aspectClass} ${compact ? 'rounded-md' : 'rounded-xl'} ${transitionClass}`}
         style={{ backgroundColor: '#0F172A' }}
       >
         {slide.imageUrl && (
@@ -274,13 +338,14 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
             )}
           </div>
         </div>
+        {renderShapeOverlays()}
       </div>
     );
   }
 
   return (
     <div
-      className={`relative w-full overflow-hidden flex flex-col justify-between ${aspectClass} ${compact ? 'p-3 rounded-md' : 'px-8 pt-7 pb-6 md:px-10 md:pt-8 md:pb-6 rounded-xl'}`}
+      className={`relative w-full overflow-hidden flex flex-col justify-between ${aspectClass} ${compact ? 'p-3 rounded-md' : 'px-8 pt-7 pb-6 md:px-10 md:pt-8 md:pb-6 rounded-xl'} ${transitionClass}`}
       style={{
         backgroundColor: bg,
         border: `1px solid ${theme.borderColor}`,
@@ -789,24 +854,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       </div>
 
       {/* Custom Shapes Overlay */}
-      {!compact &&
-        (slide.shapes || []).map((sh) => (
-          <div
-            key={sh.id}
-            className="absolute flex items-center justify-center text-xs font-semibold text-white shadow-sm pointer-events-none"
-            style={{
-              left: `${sh.x}%`,
-              top: `${sh.y}%`,
-              width: `${sh.w}%`,
-              height: `${sh.h}%`,
-              backgroundColor: sh.color,
-              borderRadius: sh.type === 'circle' ? '9999px' : '10px',
-              opacity: 0.92,
-            }}
-          >
-            {sh.label}
-          </div>
-        ))}
+      {renderShapeOverlays()}
 
       {/* Footer */}
       {!compact && (

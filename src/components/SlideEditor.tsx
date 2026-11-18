@@ -31,6 +31,9 @@ import {
   PresentationRecord,
   SlideData,
   SlideLayout,
+  SlideShapeElement,
+  SlideShapeAnimation,
+  SlideTransitionEffect,
 } from '../shared/types';
 import { SlideRenderer } from './SlideRenderer';
 
@@ -54,6 +57,25 @@ const LAYOUT_OPTIONS: Array<{ id: SlideLayout; label: string }> = [
   { id: 'quote-image', label: 'Quote & Image' },
   { id: 'chart-analysis', label: 'Chart & Analysis' },
   { id: 'closing-summary', label: 'Closing Summary' },
+];
+
+const TRANSITION_OPTIONS: Array<{ value: SlideTransitionEffect; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide-left', label: 'Slide from left' },
+  { value: 'slide-right', label: 'Slide from right' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'flip', label: 'Flip' },
+  { value: 'bounce', label: 'Bounce' },
+];
+
+const SHAPE_ANIMATION_OPTIONS: Array<{ value: SlideShapeAnimation; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'float', label: 'Float' },
+  { value: 'pulse', label: 'Pulse' },
+  { value: 'spin', label: 'Spin' },
+  { value: 'bounce', label: 'Bounce' },
+  { value: 'shimmer', label: 'Shimmer' },
 ];
 
 export const SlideEditor: React.FC<SlideEditorProps> = ({
@@ -171,6 +193,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     if (!activeSlide) return;
     const next = slides.map((s, idx) => (idx === activeIdx ? { ...s, ...patch } : s));
     commitSlides(next);
+  };
+
+  const updateShape = (shapeId: string, patch: Partial<SlideShapeElement>) => {
+    if (!activeSlide) return;
+    updateActiveSlide({
+      shapes: (activeSlide.shapes || []).map((shape) =>
+        shape.id === shapeId ? { ...shape, ...patch } : shape
+      ),
+    });
   };
 
   const updateMeta = async (patch: {
@@ -870,6 +901,28 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    Slide Transition
+                  </label>
+                  <select
+                    value={activeSlide.transitionEffect || 'fade'}
+                    onChange={(e) =>
+                      updateActiveSlide({ transitionEffect: e.target.value as SlideTransitionEffect })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white"
+                  >
+                    {TRANSITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Plays in previews and exports to PowerPoint. Bounce uses Zoom in PowerPoint.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
                     Presentation Color Theme
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1159,11 +1212,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                     {[
-                      { type: 'rect' as const, label: 'Badge Box' },
+                      { type: 'rect' as const, label: 'Rectangle' },
                       { type: 'circle' as const, label: 'Circle' },
-                      { type: 'callout' as const, label: 'Highlight' },
+                      { type: 'callout' as const, label: 'Callout' },
+                      { type: 'star' as const, label: 'Star' },
+                      { type: 'badge' as const, label: 'Badge' },
+                      { type: 'glass-card' as const, label: 'Glass Card' },
+                      { type: 'gradient-pill' as const, label: 'Gradient Pill' },
                     ].map((sh) => (
                       <button
                         key={sh.type}
@@ -1173,14 +1230,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                             shapes: [
                               ...(activeSlide.shapes || []),
                               {
-                                id: `sh_${Date.now()}`,
+                                id: `sh_${crypto.randomUUID()}`,
                                 type: sh.type,
                                 label: sh.label,
                                 x: 74,
-                                y: 18 + (activeSlide.shapes?.length || 0) * 12,
+                                y: Math.min(78, 18 + (activeSlide.shapes?.length || 0) * 12),
                                 w: 18,
                                 h: 9,
                                 color: '#4F46E5',
+                                animation: 'none',
                               },
                             ],
                           })
@@ -1191,6 +1249,118 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                       </button>
                     ))}
                   </div>
+                  {(activeSlide.shapes || []).length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      {(activeSlide.shapes || []).map((shape) => (
+                        <div
+                          key={shape.id}
+                          className="rounded-lg border border-slate-200 p-2.5 space-y-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              aria-label={`Label for ${shape.label}`}
+                              value={shape.label}
+                              onChange={(e) => updateShape(shape.id, { label: e.target.value })}
+                              className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-[11px]"
+                            />
+                            <input
+                              aria-label={`Color for ${shape.label}`}
+                              type="color"
+                              value={shape.color}
+                              onChange={(e) => updateShape(shape.id, { color: e.target.value })}
+                              className="h-7 w-8 cursor-pointer rounded border border-slate-300 p-0.5"
+                            />
+                            <select
+                              aria-label={`Shape for ${shape.label}`}
+                              value={shape.type}
+                              onChange={(e) =>
+                                updateShape(shape.id, {
+                                  type: e.target.value as SlideShapeElement['type'],
+                                })
+                              }
+                              className="max-w-24 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px]"
+                            >
+                              <option value="rect">Rectangle</option>
+                              <option value="circle">Circle</option>
+                              <option value="callout">Callout</option>
+                              <option value="star">Star</option>
+                              <option value="badge">Badge</option>
+                              <option value="glass-card">Glass card</option>
+                              <option value="gradient-pill">Gradient pill</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateActiveSlide({
+                                  shapes: (activeSlide.shapes || []).filter(
+                                    (item) => item.id !== shape.id
+                                  ),
+                                })
+                              }
+                              aria-label={`Remove ${shape.label}`}
+                              className="p-1 text-slate-400 hover:text-red-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                            {([
+                              ['Horizontal position', 'x', 0, 90],
+                              ['Vertical position', 'y', 0, 90],
+                              ['Width', 'w', 5, 50],
+                              ['Height', 'h', 5, 40],
+                              ['Rotation', 'rotation', -180, 180],
+                            ] as const).map(([label, key, min, max]) => (
+                              <label key={key} className="text-[10px] text-slate-500">
+                                <span className="flex justify-between">
+                                  <span>{label}</span>
+                                  <span>{shape[key] || 0}{key === 'rotation' ? '°' : '%'}</span>
+                                </span>
+                                <input
+                                  type="range"
+                                  min={min}
+                                  max={
+                                    key === 'x'
+                                      ? 100 - shape.w
+                                      : key === 'y'
+                                        ? 100 - shape.h
+                                        : max
+                                  }
+                                  value={shape[key] || 0}
+                                  onChange={(e) =>
+                                    updateShape(shape.id, { [key]: Number(e.target.value) })
+                                  }
+                                  className="w-full"
+                                />
+                              </label>
+                            ))}
+                            <label className="text-[10px] text-slate-500">
+                              <span className="block">Animation</span>
+                              <select
+                                aria-label={`Animation for ${shape.label}`}
+                                value={shape.animation || 'none'}
+                                onChange={(e) =>
+                                  updateShape(shape.id, {
+                                    animation: e.target.value as SlideShapeAnimation,
+                                  })
+                                }
+                                className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px]"
+                              >
+                                {SHAPE_ANIMATION_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    Shape animations export to PowerPoint and play on click. In SlideCraft previews, they loop continuously.
+                  </p>
                 </div>
 
                 {/* Add / Edit Chart */}
@@ -1295,12 +1465,14 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           <div className="flex-1 flex items-center justify-center my-4 min-h-0">
             <div className="w-full max-w-5xl">
               <SlideRenderer
+                key={activeSlide.id}
                 slide={activeSlide}
                 themeId={presentation.themeId}
                 aspectRatio={presentation.aspectRatio}
                 slideIndex={activeIdx}
                 totalSlides={slides.length}
                 deckTitle={presentation.title}
+                animateTransition
               />
             </div>
           </div>
